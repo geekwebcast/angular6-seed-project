@@ -1,12 +1,10 @@
 import { HttpInterceptor, HttpRequest, HttpHandler, HttpEvent, HttpResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import 'rxjs/add/operator/catch';
 import { environment } from '@env/environment';
 import { LoaderService } from '@app/shared-module/sharedServices/loader.service';
-import { Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
-import 'rxjs/add/operator/do';
-import 'rxjs/add/operator/catch';
+import { Observable, throwError } from 'rxjs';
+import { catchError, finalize, map } from 'rxjs/operators';
+
 
 @Injectable()
 export class AppInterceptor implements HttpInterceptor {
@@ -38,22 +36,25 @@ export class AppInterceptor implements HttpInterceptor {
     req = req.clone({
       url: `${this.apiUrl}${req.url}`,
     });
-    return next.handle(req).do(event => {
-      this.hideLoader();
-      // place for handling web app logger
-      if (event instanceof HttpResponse) {
-        // this.logger.logDebug(event);
-      }
-    })
-      .catch(err => {
+    return next.handle(req).pipe(
+      map(event => {
+        this.hideLoader();
+        if (event instanceof HttpResponse) {
+          return event;
+          //  this.logger.logDebug(event);
+        }
+      }),
+      catchError(error => {
         this.hideLoader();
         // Handle Unauthorized Responses
-        if (err.status === 401) {
+        if (error.status === 401) {
           this.logout();
         }
-        console.log('Caught error', err);
-        return Observable.throw(err.error);
-      });
+        console.log('Caught error', error);
+        return throwError(error);
+      })
+
+    )
   }
   logout() {
     // clear the local storage and navigate to login page
@@ -67,6 +68,6 @@ export class AppInterceptor implements HttpInterceptor {
   private hideLoader(): void {
     setTimeout(() => {
       this.loaderService.display(false);
-  }, 1000);
+    }, 1000);
   }
 }
